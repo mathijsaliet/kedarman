@@ -1,0 +1,8 @@
+Bungee-Regular.ttf
+Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)
+Licensed under the SIL Open Font License, Version 1.1. See OFL.txt.
+
+Outfit-Medium.ttf and Outfit-Bold.ttf
+Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+Licensed under the SIL Open Font License, Version 1.1.
+https://openfontlicense.org
