@@ -67,7 +67,7 @@
 
     noiseBuf: null,
 
-    noise(dur, vol, filterType, freq, freqTo, q) {
+    noise(dur, vol, filterType, freq, freqTo, q, when) {
       const ctx = this.ensure();
       if (!ctx || vol <= 0) return;
       if (!this.noiseBuf) {
@@ -75,7 +75,7 @@
         const data = this.noiseBuf.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       }
-      const t = ctx.currentTime;
+      const t = when == null ? ctx.currentTime : when;
       const src = ctx.createBufferSource();
       const filter = ctx.createBiquadFilter();
       const gain = ctx.createGain();
@@ -93,7 +93,13 @@
       src.stop(t + dur + 0.03);
     },
 
-    /* Odd noises, one per fast food in game.js FOODS (same order). */
+    /* One bite: a jaw thump plus a filtered noise crunch. Higher cutoff = crunchier. */
+    bite(when, cutoff, vol) {
+      this.tone(150, 0.07, "sine", vol * 0.9, 55, when);
+      this.noise(0.07, vol, "lowpass", cutoff, cutoff * 0.35, 0.7, when);
+    },
+
+    /* Eating sounds, one per fast food in game.js FOODS (same order). */
     munch(kind) {
       const now = performance.now();
       if (now - this.lastChomp < 85) return;
@@ -102,37 +108,31 @@
       if (!ctx) return;
       const t = ctx.currentTime;
       switch (kind) {
-        case 0: // burger: little burp
-          this.tone(130, 0.16, "sawtooth", 0.05, 70);
-          this.tone(95, 0.12, "square", 0.025, 60, t + 0.03);
+        case 1: // fries: crispy crunch
+          this.noise(0.05, 0.14, "bandpass", 3200, 1500, 0.9, t);
+          this.noise(0.05, 0.1, "bandpass", 2600, 1200, 0.9, t + 0.05);
           break;
-        case 1: // fries: crunch
-          this.noise(0.07, 0.12, "bandpass", 2400, 900, 0.8);
+        case 5: // donut: soft squishy bite
+          this.bite(t, 600, 0.09);
           break;
-        case 2: // pizza: boing
-          this.tone(180, 0.18, "sine", 0.07, 720);
-          this.tone(360, 0.1, "sine", 0.03, 260, t + 0.08);
+        case 6: // soda: slurp then gulp
+          this.noise(0.12, 0.07, "bandpass", 700, 2200, 5, t);
+          this.tone(260, 0.07, "sine", 0.07, 110, t + 0.1);
           break;
-        case 3: // hot dog: rubber squeak
-          this.tone(900, 0.05, "square", 0.03, 1400);
-          this.tone(1400, 0.06, "square", 0.025, 1000, t + 0.05);
+        case 7: // chicken: big tearing chomp
+          this.bite(t, 2400, 0.12);
+          this.noise(0.08, 0.06, "highpass", 3000, 1500, 0.7, t + 0.04);
           break;
-        case 4: // taco: kazoo
-          this.tone(330, 0.13, "sawtooth", 0.045, 370);
-          this.tone(333, 0.13, "sawtooth", 0.03, 365);
+        case 8: // ice cream: wet nom
+          this.bite(t, 900, 0.08);
+          this.noise(0.06, 0.04, "bandpass", 1200, 600, 3, t + 0.05);
           break;
-        case 5: // donut: bloop
-          this.tone(720, 0.12, "sine", 0.08, 140);
-          break;
-        case 6: // soda: slurp
-          this.noise(0.16, 0.09, "bandpass", 500, 2600, 6);
-          break;
-        case 7: // chicken: bawk
-          this.tone(620, 0.05, "square", 0.035, 760);
-          this.tone(480, 0.08, "square", 0.03, 380, t + 0.06);
-          break;
-        default: // ice cream: pew
-          this.tone(1600, 0.12, "triangle", 0.06, 200);
+        default: {
+          // burger, pizza, hot dog, taco: nom-nom double chomp, pitch varies by food
+          const crunch = [1400, 0, 1800, 1200, 2200][kind] || 1500;
+          this.bite(t, crunch, 0.11);
+          this.bite(t + 0.07, crunch * 0.75, 0.08);
+        }
       }
     },
 
@@ -142,12 +142,44 @@
       this.tone(base + (tick ? step : 0), frightened ? 0.09 : 0.16, "sine", frightened ? 0.03 : 0.022);
     },
 
+    /* Short "hnngh": a low voice through a vowel-ish filter, plus a breath. */
+    grunt(when) {
+      const ctx = this.ensure();
+      if (!ctx) return;
+      const t = when == null ? ctx.currentTime : when;
+      const dur = 0.26;
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(125, t);
+      osc.frequency.linearRampToValueAtTime(140, t + 0.06);
+      osc.frequency.exponentialRampToValueAtTime(82, t + dur);
+      filter.type = "bandpass";
+      filter.frequency.value = 520;
+      filter.Q.value = 2.5;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.16, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + dur + 0.03);
+      this.noise(0.12, 0.035, "lowpass", 900, 400, 0.7, t);
+    },
+
     power() {
       const ctx = this.ensure();
       if (!ctx) return;
-      [523, 659, 784, 1046].forEach((freq, i) => {
-        this.tone(freq, 0.11, "square", 0.04, null, ctx.currentTime + i * 0.07);
-      });
+      // Giant burger: big bite, chew, chew, grunt, swallow.
+      const t = ctx.currentTime;
+      this.lastChomp = performance.now() + 450;
+      this.bite(t, 2000, 0.14);
+      this.bite(t + 0.13, 1100, 0.1);
+      this.bite(t + 0.24, 900, 0.09);
+      this.grunt(t + 0.3);
+      this.tone(240, 0.08, "sine", 0.08, 100, t + 0.56);
     },
 
     eat() {
