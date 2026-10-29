@@ -368,7 +368,7 @@
     if (mode === "title") {
       title.textContent = "KEDARMAN";
       sub.textContent = "Kedar Karippail · Head of Client Service";
-      body.textContent = "Eat every pellet. Quadrant marks turn the ghosts around.";
+      body.textContent = "Kedar is training to be a competitive eater. Clear the menu. Giant burgers turn the ghosts around.";
       actionBtn.textContent = "PLAY";
     } else if (mode === "pause") {
       title.textContent = "PAUSED";
@@ -656,7 +656,7 @@
     sincePellet = 0;
     if (ch === ".") {
       addPoints(10);
-      KM.audio.chomp();
+      KM.audio.munch(foodAt(t.c, t.r));
     } else {
       addPoints(50);
       startFright();
@@ -941,9 +941,39 @@
     ctx.fillRect(x, y + 5, TILE * 2 - 6, 2);
   }
 
+  /* Kedar is in competitive-eating training: every pellet is fast food.
+     Each item has its own sound in KM.audio.munch(). Emoji are drawn once
+     to small canvases, so the board does not re-render ~240 glyphs a frame. */
+  const FOODS = ["🍔", "🍟", "🍕", "🌭", "🌮", "🍩", "🥤", "🍗", "🍦"];
+  const POWER_FOOD = "🍔";
+  const foodSprites = {};
+
+  function foodAt(c, r) {
+    return ((c * 7 + r * 13 + ((c * r) % 5)) % FOODS.length + FOODS.length) % FOODS.length;
+  }
+
+  function foodSprite(emoji) {
+    if (foodSprites[emoji]) return foodSprites[emoji];
+    const size = 64;
+    const sprite = document.createElement("canvas");
+    sprite.width = size;
+    sprite.height = size;
+    const sctx = sprite.getContext("2d");
+    sctx.font = size * 0.8 + 'px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    sctx.textAlign = "center";
+    sctx.textBaseline = "middle";
+    sctx.fillText(emoji, size / 2, size / 2 + size * 0.05);
+    foodSprites[emoji] = sprite;
+    return sprite;
+  }
+
+  function drawFood(emoji, x, y, size) {
+    ctx.drawImage(foodSprite(emoji), x - size / 2, y - size / 2, size, size);
+  }
+
   function drawPower(x, y) {
     const pulse = 1 + Math.sin(simT * 5) * 0.12;
-    const radius = 8.3 * pulse;
+    const radius = 12 * pulse;
     const colors = ["#c57d3a", "#f4e4cc", "#e25b45", "#1f6f6a"];
     const gap = 0.08;
     for (let i = 0; i < 4; i++) {
@@ -966,12 +996,10 @@
         const x = c * TILE + TILE / 2;
         const y = r * TILE + TILE / 2;
         if (ch === ".") {
-          ctx.fillStyle = "#ffe14a";
-          ctx.beginPath();
-          ctx.arc(x, y, 2.8, 0, Math.PI * 2);
-          ctx.fill();
+          drawFood(FOODS[foodAt(c, r)], x, y, 15);
         } else {
           drawPower(x, y);
+          drawFood(POWER_FOOD, x, y, 19 * (1 + Math.sin(simT * 5) * 0.1));
         }
       }
     }
